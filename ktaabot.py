@@ -2,56 +2,64 @@
 # coding: utf-8
 
 import datetime as dt
-import json
-import pandas as pd
 import random
 import time
-import urllib2
-import yaml
 
 import game_model as gm
 
-try:
-    with open('config.yml') as f:
-        CONFIG = yaml.load(f)
-except IOError:
-    print 'Configuration file (config.yml) is missing. Please make one.'
-    exit()
-except:
-    raise
-
-API_TOKEN = CONFIG.get('telegram_token', False)
-assert API_TOKEN, 'Telegram api token not found.'
-
-BASE_URL = 'https://api.telegram.org/bot%s' % (API_TOKEN)
 MIN_WORD_LEN = 3
 MAX_QUERY_LEN = 50
 
+GAME_OBJ = {}
+# game_obj = {
+    # chat['id']: {
+    # 'game': game_model,
+    # 'chat_type': group/private,
+    # 'answer': {'first_name': [],
+    #           }
+# }
+# }
 
-def json_request(method, payload):
-    url = '%s/%s' % (BASE_URL, method)
-    payload_text = json.dumps(payload)
+POINTS = {3: 1,
+          4: 1,
+          5: 2,
+          6: 3,
+          7: 5,
+          8: 11}
 
-    request = urllib2.Request(url, payload_text)
-    request.add_header('Content-Type', 'application/json')
+DEBUG = True
+GAME_DURATION = 300
+GAME_REMAINDER = 30
+GAME_WAIT_BEGIN = 30
+GAME_GROUP_QUOTA = 2
+GAME_REMAINDER_BEGIN = 10
+GAME_REMAINDER_GRID = 10
 
-    result = False
-    try:
-        res = urllib2.urlopen(request)
-        body = res.read()
-        result = json.loads(body)
-    except KeyboardInterrupt:
-        raise
-    except:
-        pass
+if DEBUG:
+    GAME_DURATION = 30
+    GAME_REMAINDER = 10
+    GAME_WAIT_BEGIN = 10
+    GAME_REMAINDER_BEGIN = 5
+    GAME_REMAINDER_GRID = 3
+GAME_INTERVAL = 1
 
-    return result
+GAME_STATE_DRAFT = 1
+GAME_STATE_RUNNING = 1<<1
+GAME_STATE_FINISH = 1<<2
+GAME_STATE_REMIND_OK = 1<<3
+GAME_STATE_REMIND_BEGIN_OK = 1<<4
+
+COMMANDS = ['/aturan', '/buat', '/game', '/skor']
+
+# NOTES: for refactor
+import net_request as req
+json_request = req.json_request
 
 def print_grid(chat_id, message_id=False):
     game_ins = GAME_OBJ[chat_id]
     grid = game_ins['game']['grid'].split(' ')
     
-    respond_text = 'Grid KTTA:\n\n'
+    respond_text = 'Grid KTAA:\n\n'
     respond_text += '''```text\n'''
     for g in grid:
         g_ = '{:>12}'.format(''.join(['%s ' %x for x in g.upper()]))
@@ -157,45 +165,6 @@ def get_point(word):
     
 last_update_id = 0
 
-GAME_OBJ = {}
-# game_obj = {
-    # chat['id']: {
-    # 'game': game_model,
-    # 'chat_type': group/private,
-    # 'answer': {'first_name': [],
-    #           }
-# }
-# }
-
-POINTS = {3: 1,
-          4: 1,
-          5: 2,
-          6: 3,
-          7: 5,
-          8: 11}
-
-DEBUG = not True
-GAME_DURATION = 300
-GAME_REMAINDER = 30
-GAME_WAIT_BEGIN = 30
-GAME_GROUP_QUOTA = 2
-GAME_REMAINDER_BEGIN = 10
-
-if DEBUG:
-    GAME_DURATION = 30
-    GAME_REMAINDER = 10
-    GAME_WAIT_BEGIN = 10
-    GAME_REMAINDER_BEGIN = 5
-GAME_INTERVAL = 1
-
-GAME_STATE_DRAFT = 1
-GAME_STATE_RUNNING = 1<<1
-GAME_STATE_FINISH = 1<<2
-GAME_STATE_REMIND_OK = 1<<3
-GAME_STATE_REMIND_BEGIN_OK = 1<<4
-
-COMMANDS = ['/aturan', '/buat', '/game', '/skor']
-
 while True:
     updates = json_request('getUpdates', {'offset': last_update_id})
     
@@ -209,8 +178,7 @@ while True:
         if result.get('message', False): #and result['message'].get('entities', False):
             game_ins = GAME_OBJ.get(result['message']['chat']['id'], False)
             
-            command = False
-            answer = False
+            command, answer = False, False
             msg_text = result['message'].get('text', False)
             if msg_text:
                 args = parse_input(result)
@@ -261,7 +229,11 @@ while True:
                                              {'chat_id': result['message']['chat']['id'],
                                               'text': respond_text,
                                               'reply_to_message_id': result['message']['message_id'],})
-                                print_grid(result['message']['chat']['id'])              
+                                # NOTES: send grid remainder, only when it idle
+                                # don't spam!
+                                elapsed_last_update = time.time() - game_ins['last_update']
+                                if elapsed_last_update > GAME_REMAINDER:
+                                    print_grid(result['message']['chat']['id'])              
                                               
                         else:
                             respond_text = 'Game belum dimulai. Gunakan /game untuk menambah kuota'
