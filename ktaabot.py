@@ -159,7 +159,10 @@ def parse_input(update_obj):
 
 def get_point(word):
     # NOTES: longer than 8 character
-    result = POINTS.get(len(word), 15)
+    if len(word) < MIN_WORD_LEN:
+        result = 0
+    else:    
+        result = POINTS.get(len(word), max(POINTS.values()))
     
     return result
     
@@ -338,7 +341,6 @@ Cari kata dari grid. Setiap kata sama dengan rangkaian karakter dalam grid. Kamu
             # NOTES: recheck to update last_update
             if game_ins and (answer or command in COMMANDS):
                 # NOTES: update last_update (last command event occurs)
-                # deprecated
                 game_ins['last_update'] = time.time()
     
                 
