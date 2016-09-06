@@ -90,13 +90,15 @@ select * from grid where id = ?'''
     
     return game
 
-def store_game(game, points):
+def store_game(game):
     # {'chat_type': u'private', 
     #  'game': {'id': 67,}, 
     #  'create_date': 1472467820.975, 
     #  'chat_id': -242989999, 
     #  'answer': {u'-xxx-$666986515': [u'gila', u'kita'],
     #             u'-yyy-$999986515': [u'aku', u'hilaf']}, 
+    #  'score': {u'-xxx-$666986515': 2,
+    #            u'-yyy-$999986515': 3},
     #  'state': int}
     # 
     # structure
@@ -115,13 +117,10 @@ insert into game_instance (id, grid_id, chat_type, chat_id, state, create_date) 
         cur.execute(query, (game_id, game['game']['id'], game['chat_type'], 
                             game['chat_id'], str(game['state']), game['create_date']))
 
-        for user, ans in game['answer'].items():
+        for user, score in game['score'].items():
         
             user_name, user_id = user.split('$')
             user_id = int(user_id)
-            # TODOS: refactor this because duplication
-            point = lambda x: points.get(len(x), max(points.values()))
-            score = sum([point(x) for x in ans])
 
             query2 = '''\
 insert into answer (game_id, user_name, user_id, score) values
@@ -161,20 +160,16 @@ limit 10;'''
     
 if __name__ == '__main__':
     # testing
-    POINTS = {3: 1,
-          4: 1,
-          5: 2,
-          6: 3,
-          7: 5,
-          8: 11}
     game = {'chat_type': u'private', 
             'game': {'id': 67,}, 
-            'create_date': 1472467820.975, 
+            'create_date': time.time(), 
             'chat_id': -242989999, 
             'answer': {u'-xxx-$666986515': [u'gila', u'kita'],
                        u'-yyy-$999986515': [u'aku', u'hilaf']}, 
+            'score': {u'-xxx-$666986515': 2,
+                      u'-yyy-$999986515': 3},
             'state': 5}
-    # store_game(game, POINTS)
+    # store_game(game)
     
     # chat_id = 242986515#-173640045
     # res = get_score(chat_id)

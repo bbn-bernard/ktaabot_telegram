@@ -7,7 +7,7 @@ import time
 
 import game_model as gm
 
-GAME_VERSION = '0.1.1696'
+GAME_VERSION = '0.1.1697'
 
 MIN_WORD_LEN = 3
 MAX_QUERY_LEN = 50
@@ -407,7 +407,15 @@ while True:
         # NOTES: remove game from game instance object
         GAME_OBJ.pop(game['chat_id'])
         
-        gm.store_game(game, POINTS)
+        # NOTES: set score
+        answer_obj = game['answer']
+        scores = {}
+        for k,vs in answer_obj.items():
+            score = sum([get_point(w) for w in vs])
+            scores.update({k: score})
+        game.update({'score': scores})
+        
+        gm.store_game(game)
     
     time.sleep(GAME_INTERVAL)
 
