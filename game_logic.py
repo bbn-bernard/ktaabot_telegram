@@ -7,8 +7,7 @@ import random
 NCOLS, NROWS = 4, 4
 DICT = pd.read_csv(r'data/words.txt', header=None)
 DICT.columns = ['word']
-DICT['word'] = DICT['word'].astype(str).str.lower()
-DICT = DICT[~DICT['word'].str.contains('-')]
+DICT['word'] = DICT['word'].astype(str)
 ALPHABET = [chr(c) for c in range(ord('a'), ord('z')+1)]
 
 def get_random_pos():
