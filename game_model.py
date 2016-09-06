@@ -119,7 +119,9 @@ insert into game_instance (id, grid_id, chat_type, chat_id, state, create_date) 
         
             user_name, user_id = user.split('$')
             user_id = int(user_id)
-            score = sum([points[len(x)] for x in ans])
+            # TODOS: refactor this because duplication
+            point = lambda x: points.get(len(x), max(points.values()))
+            score = sum([point(x) for x in ans])
 
             query2 = '''\
 insert into answer (game_id, user_name, user_id, score) values

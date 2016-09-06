@@ -7,6 +7,8 @@ import time
 
 import game_model as gm
 
+GAME_VERSION = '0.1.1696'
+
 MIN_WORD_LEN = 3
 MAX_QUERY_LEN = 50
 
@@ -33,14 +35,14 @@ GAME_REMAINDER = 30
 GAME_WAIT_BEGIN = 30
 GAME_GROUP_QUOTA = 2
 GAME_REMAINDER_BEGIN = 10
-GAME_REMAINDER_GRID = 10
+GAME_REMAINDER_GRID = 1
 
 if DEBUG:
     GAME_DURATION = 30
     GAME_REMAINDER = 10
     GAME_WAIT_BEGIN = 10
     GAME_REMAINDER_BEGIN = 5
-    GAME_REMAINDER_GRID = 3
+    GAME_REMAINDER_GRID = 1
 GAME_INTERVAL = 1
 
 GAME_STATE_DRAFT = 1
@@ -55,11 +57,19 @@ COMMANDS = ['/aturan', '/buat', '/game', '/skor']
 import net_request as req
 json_request = req.json_request
 
-def print_grid(chat_id, message_id=False):
+def log_message(msg):
+    timestamp = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print '%s, %s' % (str(msg), timestamp)
+
+def print_grid(chat_id, message_id=False, info=False):
     game_ins = GAME_OBJ[chat_id]
     grid = game_ins['game']['grid'].split(' ')
     
-    respond_text = 'Grid KTAA:\n\n'
+    if not info:
+        respond_text = ''
+    else:
+        respond_text = '%s\n\n' % (info)
+    respond_text += 'Grid KTAA:\n\n'
     respond_text += '''```text\n'''
     for g in grid:
         g_ = '{:>12}'.format(''.join(['%s ' %x for x in g.upper()]))
@@ -194,14 +204,11 @@ while True:
             else:
                 args = []
                 
-            # print result
-            timestamp = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            print '%s, %s' % (args, timestamp)
-            
             if msg_text and not command and game_ins and \
                 game_ins['state'] & GAME_STATE_RUNNING:
                 # NOTES: process jawaban
                 if answer and len(answer) >= MIN_WORD_LEN and len(answer) < MAX_QUERY_LEN:
+                    log_message('jwb: "%s"' % answer)
                     w = answer
                     if game_ins:
                         if game_ins['state'] & GAME_STATE_RUNNING:
@@ -224,39 +231,43 @@ while True:
                                 current_ans = answer_obj.get(ans_key, [])
                                 answer_obj.update({
                                     ans_key: current_ans + [w]
-                                })    
+                                })
                                 # print game_ins
-                                respond_text = 'Kata ditemukan. Poinmu +%s' % (poin)
+                                respond_text = '"%s" ditemukan. Poin %s +%s.' % (w, result['message']['from']['first_name'], poin)
 
-                                json_request('sendMessage', 
-                                             {'chat_id': result['message']['chat']['id'],
-                                              'text': respond_text,
-                                              'reply_to_message_id': result['message']['message_id'],})
                                 # NOTES: send grid remainder, only when it idle
                                 # don't spam!
                                 elapsed_last_update = time.time() - game_ins['last_update']
-                                if elapsed_last_update > GAME_REMAINDER:
-                                    print_grid(result['message']['chat']['id'])              
+                                if elapsed_last_update > GAME_REMAINDER_GRID:
+                                    print_grid(result['message']['chat']['id'], 
+                                               info=respond_text)
                                               
                         else:
                             respond_text = 'Game belum dimulai. Gunakan /game untuk menambah kuota'
                             json_request('sendMessage', {'chat_id': result['message']['chat']['id'],
                                                          'text': respond_text,
-                                                         'reply_to_message_id': result['message']['message_id'],})   
+                                                         'reply_to_message_id': result['message']['message_id'],})
                             
                     else:
                         print_no_game(result['message']['chat']['id'], 
                                       result['message']['message_id'])
                 pass
             
-            elif command:
+            elif command and command in COMMANDS:
+                # /aturan - liat aturan game ktaa
+                # /buat - membuat game dengan grid baru
+                # /game - memulai game atau melihat grid game yang ada
+                # /skor - liat skor
+                log_message('cmd: "%s"' % command)
                 if command == '/aturan':
-                    respond_text = '''ktaabot adalah game mencari kata dari karakter-karakter acak berukuran grid 4x4. 
-Cari kata dari grid. Setiap kata sama dengan rangkaian karakter dalam grid. Kamu dapat merangkaikan karakter yang bertetangga secara horizontal, vertika, atau diagonal. Panjang kata minimal 3 karakter. Perintah yang tersedia:
-/aturan - liat aturan ini
-/buat - membuat game dengan grid baru
-/game - memulai game atau melihat grid game yang ada
-/skor - liat skor'''
+                    respond_text = '''ktaabot adalah game mencari kata dari huruf-huruf acak berukuran grid 4x4. Cari kata dari grid: 
+- Panjang kata minimal 3 huruf.
+- Kata adalah rangkaian huruf (jalur) dalam grid. 
+- Jalur kata dapat dirangkaikan dari huruf-huruf yang bertetangga secara horizontal, vertikal, atau diagonal. 
+- Dalam jalur kata tidak ada huruf yang "meloncat". 
+- Game akan berjalan selama 5 menit. 
+- Poin tergantung panjang kata yang berhasil ditemukan. 
+- Gunakan /skor untuk melihat skor sementara jika sedang ada game atau skor total.'''
                     json_request('sendMessage', {'chat_id': result['message']['chat']['id'],
                                                  'text': respond_text})
                 # TODOS: refactor
