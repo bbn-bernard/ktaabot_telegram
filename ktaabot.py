@@ -7,7 +7,7 @@ import time
 
 import game_model as gm
 
-GAME_VERSION = '0.1.1697'
+GAME_VERSION = '0.2.1697'
 
 MIN_WORD_LEN = 3
 MAX_QUERY_LEN = 50
@@ -29,7 +29,7 @@ POINTS = {3: 1,
           7: 5,
           8: 11}
 
-DEBUG = True
+DEBUG = not True
 GAME_DURATION = 300
 GAME_REMAINDER = 30
 GAME_WAIT_BEGIN = 30
@@ -241,7 +241,10 @@ while True:
                                 if elapsed_last_update > GAME_REMAINDER_GRID:
                                     print_grid(result['message']['chat']['id'], 
                                                info=respond_text)
-                                              
+                                else:
+                                    json_request('sendMessage', 
+                                                 {'chat_id': result['message']['chat']['id'],
+                                                  'text': respond_text,})                                    
                         else:
                             respond_text = 'Game belum dimulai. Gunakan /game untuk menambah kuota'
                             json_request('sendMessage', {'chat_id': result['message']['chat']['id'],

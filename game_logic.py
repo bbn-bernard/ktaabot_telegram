@@ -21,7 +21,7 @@ def neighbors((x, y)):
         for ny in range(max(0, y-1), min(y+2, NROWS)):
             yield (nx, ny)
 
-def find_path_(grid=[], pos=(), wlen=7):
+def find_path(grid=[], pos=(), wlen=7):
     path = []
     if not pos:
         pos = get_random_pos()
@@ -39,21 +39,6 @@ def find_path_(grid=[], pos=(), wlen=7):
         
     return path
 
-def find_path(grid=[], pos=(), wlen=7):
-    import time
-    
-    path = []
-    counter = 0
-    while not path:
-        path = find_path_(grid, pos, wlen)
-        counter += 1
-        if counter > 10:
-            path = []
-            break
-        time.sleep(1)
-        
-    return path
-
 def update_grid(grid, path, keyword):
     for i,pos in enumerate(path):
         grid[pos[0]][pos[1]] = keyword[i]
@@ -67,38 +52,103 @@ def get_solution(grid):
     
     return solutions
 
-def make_game():
-    grid = [['*' for i in range(NCOLS)] for k in range(NROWS)]
-    k1 = random.choice(DICT[DICT['word'].str.len() == 7].values)[0]
-    path1 = find_path(grid, (), wlen=7)
-    assert(path1)    
-    grid = update_grid(grid, path1, k1)
+# NOTES: grid type based on keyword length
+# tuple (nk1, nk2, nk3) with nk1+nk2+nk3-1 < NROWS*NCOLS
+# nk1, nk2, nk3 >= 3
+GRID_TYPE = [(7, 5, 4),
+             (9, 5, 4),
+             (10, 5, 0),
+             (11, 5, 0),
+             (12, 5, 0),
+             (14, 3, 0),
+             (15, 0, 0)]
+def create_grid(grid_type=False):
+    if grid_type:
+        type_idx = grid_type
+        assert type_idx < len(GRID_TYPE), 'wrong grid type'
+    else:
+        type_idx = random.randint(0, len(GRID_TYPE)-1)
+    nk1, nk2, nk3 = GRID_TYPE[type_idx]
+    k1, k2, k3 = ('',)*3
+    npath_max = NROWS * NCOLS
+    nretry = 100
+    while nretry > 0:
+        grid = [['*' for i in range(NCOLS)] for k in range(NROWS)]
+        k1 = random.choice(DICT[DICT['word'].str.len() == nk1].values)[0]
+        available_pos = [(x,y) for x in range(NROWS) for y in range(NCOLS) if grid[x][y] == '*']
+        random.shuffle(available_pos)
+        for pos in available_pos:
+            path1 = find_path(grid, pos, wlen=nk1)
+            if path1:
+                break
+
+        if not path1:
+            nretry -= 1
+            continue
+        
+        grid = update_grid(grid, path1, k1)
+
+        if (npath_max-(nk1-1) < 3) or (nk1 >= npath_max):
+            path3 = path1
+            break
+            
+        available_pos = path1
+        random.shuffle(available_pos)
+        path2 = []
+        for pos2 in available_pos:
+            k2_candidate = DICT[(DICT['word'].str.len() == nk2) & 
+                                    (DICT['word'].str.startswith(grid[pos2[0]][pos2[1]]))]
+            if k2_candidate.empty:
+                continue
+            k2 = random.choice(k2_candidate.values)[0]
+            path2 = find_path(grid, pos2, wlen=nk2)
+            if path2:
+                break
+                
+        if not path2:
+            nretry -= 1
+            continue
+
+        grid = update_grid(grid, path2, k2)
+        if (npath_max - (nk1+nk2-1) < 3) or (nk1+nk2-1) >= npath_max:
+            path3 = path2
+            break
+            
+        available_pos = path1 + path2
+        random.shuffle(available_pos)
+        path3 = []
+        for pos3 in available_pos:
+            k3_candidate = DICT[(DICT['word'].str.len() == nk3) & 
+                                    (DICT['word'].str.startswith(grid[pos3[0]][pos3[1]]))]
+            if k3_candidate.empty:
+                continue
+            k3 = random.choice(k3_candidate.values)[0]                                    
+            path3 = find_path(grid, pos3, wlen=nk3)
+            if path3:
+                break
+                
+        if path3:
+            grid = update_grid(grid, path3, k3)
+            break
+        nretry -= 1
+
+    result = {}
+    if path3:
+        for x in range(NROWS):
+            for y in range(NCOLS):
+                if grid[x][y] == '*':
+                    grid[x][y] = random.choice(ALPHABET)
+
+        solutions = get_solution(grid)
+        result = {'keywords': ','.join([k1, k2, k3]),
+                  'grid': ' '.join([''.join(x) for x in grid]),
+                  'solutions': ','.join(solutions),
+                  'type': type_idx}
     
-    pos2 = random.choice(path1)
-    k2 = random.choice(DICT[(DICT['word'].str.len() == 5) & 
-                            (DICT['word'].str.startswith(grid[pos2[0]][pos2[1]]))].values)[0]
-    path2 = find_path(grid, pos2, wlen=5)
-    assert(path2)
-    grid = update_grid(grid, path2, k2)
+    return result
+
+if __name__ == '__main__':
+    # TESTING
+    # print create_grid()
     
-    pos3 = random.choice(path2)
-    k3 = random.choice(DICT[(DICT['word'].str.len() == 4) & 
-                            (DICT['word'].str.startswith(grid[pos3[0]][pos3[1]]))].values)[0]
-    path3 = find_path(grid, pos3, wlen=4)
-    assert(path3)
-    grid = update_grid(grid, path3, k3)
-
-    for x in range(NROWS):
-        for y in range(NCOLS):
-            if grid[x][y] == '*':
-                grid[x][y] = random.choice(ALPHABET)
-
-    solutions = get_solution(grid)
-    game = {'keywords': ','.join([k1, k2, k3]),
-            'grid': ' '.join([''.join(x) for x in grid]),
-            'solutions': ','.join(solutions)}
-    
-    return game
-
-
 

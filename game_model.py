@@ -12,38 +12,21 @@ def db_con():
     
     return con
 
-def get_last_grid_id():
+def create_grid():
     con = db_con()
-    cur = con.cursor()
-    query = '''\
-select id from grid order by id desc limit 1;'''
-    cur.execute(query)
-    res = cur.fetchone()
-    grid_id = res[0] + 1
-    
-    return grid_id
-
-def create_grid(last_id=False):
-    con = db_con()
-    if not last_id:
-        grid_id = get_last_grid_id() + 1
-    
-    try:
-        game = game_logic.make_game()
-    except:
-        cur.close()
-        con.close()
-
-        return False
-    
-    data = json.dumps(game)
-    
-    cur = con.cursor()
-    query = '''\
-insert into grid (id, json) values (?, ?);'''
-    cur.execute(query, (grid_id, data))
-    con.commit()    
-    
+    game = game_logic.create_grid()
+    if game:
+        data = json.dumps(game)        
+        cur = con.cursor()
+        query = '''\
+insert into grid (id, json) 
+select id+1, '%s' from grid order by id desc limit 1;''' % (data)
+        try:
+            cur.execute(query)
+            con.commit()
+        except sqlite3.Error as e:
+            print 'query error: %s' % e.args[0]
+            print query
     cur.close()
     con.close()
     
@@ -177,4 +160,6 @@ if __name__ == '__main__':
     
     # print get_available_grid(-242989999)
     # print get_game(-242989999)
+    
+    # create_grid()
     
